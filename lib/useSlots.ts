@@ -26,6 +26,7 @@ async function postPatch(patch: SlotsPatch): Promise<undefined> {
     headers: { "content-type": "application/json" },
     body: JSON.stringify(patch),
   });
+  if (res.status === 401) window.location.reload(); // session expired: back to sign-in
   if (!res.ok) throw new Error(`POST /api/slots failed: ${res.status}`);
 }
 
@@ -56,7 +57,8 @@ export function useSlots(weekStart: Date, meId: string): UseSlots {
       if (!patch.add.length && !patch.remove.length) return;
       try {
         await mutate(postPatch(patch), {
-          optimisticData: (cur) => applyPatch(cur, meId, patch, from, to),
+          // Build on what is displayed, not the committed cache, so back-to-back drags compose.
+          optimisticData: (_committed, displayed) => applyPatch(displayed, meId, patch, from, to),
           populateCache: false,
           revalidate: true,
           rollbackOnError: true,

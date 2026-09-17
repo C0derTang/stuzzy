@@ -23,7 +23,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (account && profile?.sub) {
         const row = {
           email: profile.email!.toLowerCase(),
-          name: profile.name ?? profile.email!,
+          name: profile.name ?? "Stanford user",
           image: typeof profile.picture === "string" ? profile.picture : null,
         };
         await db

@@ -7,7 +7,9 @@ import type { SlotsResponse } from "@/lib/types";
 
 const MAX_SPAN_MS = 8 * 24 * 60 * 60 * 1000;
 const MAX_PATCH = 700;
-const MAX_DATE_MS = 8.64e15; // beyond this `new Date(ms)` is invalid
+// Nobody plans further out than this; also keeps `new Date(ms)` valid and bounds what one account can store.
+const MAX_DISTANCE_MS = 366 * 24 * 60 * 60 * 1000;
+const isNear = (ms: number) => Math.abs(ms - Date.now()) <= MAX_DISTANCE_MS;
 
 const error = (status: number, message: string) => Response.json({ error: message }, { status });
 
@@ -17,7 +19,7 @@ export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
   const from = Number(params.get("from") ?? NaN);
   const to = Number(params.get("to") ?? NaN);
-  if (!Number.isSafeInteger(from) || !Number.isSafeInteger(to) || from >= to || to - from > MAX_SPAN_MS) {
+  if (!Number.isSafeInteger(from) || !Number.isSafeInteger(to) || from >= to || to - from > MAX_SPAN_MS || !isNear(from)) {
     return error(400, "bad range");
   }
 
@@ -36,7 +38,7 @@ export async function GET(request: Request) {
 }
 
 const isSlotList = (v: unknown): v is number[] =>
-  Array.isArray(v) && v.length <= MAX_PATCH && v.every((ms) => typeof ms === "number" && isAligned(ms) && Math.abs(ms) <= MAX_DATE_MS);
+  Array.isArray(v) && v.length <= MAX_PATCH && v.every((ms) => typeof ms === "number" && isAligned(ms) && isNear(ms));
 
 export async function POST(request: Request) {
   const me = await getUser();

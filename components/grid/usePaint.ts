@@ -58,13 +58,15 @@ export function usePaint({ weekStart, mySlots, onCommit }: Options) {
   const dragging = draft !== null;
   useEffect(() => {
     if (!dragging) return;
+    // Capture phase + preventDefault: week shortcuts must not fire mid-drag.
     const onKey = (e: KeyboardEvent) => {
+      e.preventDefault();
       if (e.key !== "Escape") return;
       drag.current = null;
       setDraft(null);
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
   }, [dragging]);
 
   const onPointerDown = (e: PointerEvent<HTMLElement>) => {
@@ -84,6 +86,7 @@ export function usePaint({ weekStart, mySlots, onCommit }: Options) {
   const onPointerMove = (e: PointerEvent<HTMLElement>) => {
     const d = drag.current;
     if (!d) return;
+    if (e.buttons === 0) return cancel(); // the pointerup was lost (e.g. context menu)
     const current = cellAt(e.currentTarget, e.clientX, e.clientY);
     if (current.day === d.current.day && current.row === d.current.row) return;
     const next = { ...d, current };

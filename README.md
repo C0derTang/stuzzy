@@ -10,7 +10,7 @@ everyone is free glow cardinal.
 
 ## Stack
 
-Next.js 16 (App Router) · Auth.js v5 (JWT sessions, no adapter) · Neon Postgres + Drizzle ·
+Next.js 16 (App Router) · Clerk · Neon Postgres + Drizzle ·
 Tailwind v4 + plain CSS glass · SWR · Vitest
 
 ## Setup
@@ -27,23 +27,19 @@ pnpm dev
 | Variable | What |
 |---|---|
 | `DATABASE_URL` | Neon Postgres connection string |
-| `AUTH_SECRET` | `openssl rand -base64 33` |
-| `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` | Google OAuth client (below) |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` / `CLERK_SECRET_KEY` | Clerk API keys |
 | `DEV_FAKE_USER` | Development only. Id of a seeded user (e.g. `dev-alice`) to skip Google locally. Ignored in production. |
 
-### Google OAuth client (one-time, manual)
+### Sign-in (Clerk)
 
-1. [Google Cloud Console](https://console.cloud.google.com/) → new project → **APIs & Services → OAuth consent screen**.
-   Choose **External** and **publish to production** (basic `email`/`profile` scopes need no verification;
-   in "Testing" mode only 100 hand-listed users can sign in).
-2. **Credentials → Create credentials → OAuth client ID → Web application**. Authorized redirect URIs
-   (wildcards are not allowed, so preview deployments cannot sign in):
-   - `http://localhost:3000/api/auth/callback/google`
-   - `https://<your-production-domain>/api/auth/callback/google`
-3. Put the client id and secret in `.env.local` (and in Vercel for production).
+Auth is [Clerk](https://clerk.com) with Google as the only button. The app runs on a Clerk **development
+instance**, which ships with Clerk's shared Google OAuth credentials, so no Google Cloud project is needed.
+Trade-offs of a development instance: 100-user cap and a small "development mode" badge. Moving to a Clerk
+production instance later requires a custom domain and your own Google OAuth client.
 
-The Stanford restriction is enforced server-side in `lib/auth-rules.ts`: Google must report a verified
-email, hosted domain `stanford.edu`, and an address ending in `@stanford.edu`.
+The Stanford restriction is enforced server-side in `lib/auth-rules.ts` + `lib/session.ts`: on page load the
+Clerk user must have a **verified Google account at exactly `@stanford.edu`**; anyone else is rejected and
+their Clerk user is deleted. Only accepted users get a row in `users`, and the API only serves users with a row.
 
 ### Try it without Google
 
@@ -55,8 +51,8 @@ pnpm dev
 
 ## Deploy (Vercel)
 
-Import the GitHub repo in Vercel, add the four production environment variables, deploy, then add the
-production callback URL to the Google OAuth client.
+Import the GitHub repo in Vercel, run `vercel integration add clerk` (provisions the Clerk keys), add
+`DATABASE_URL`, and deploy.
 
 ## How it works
 

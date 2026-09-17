@@ -1,26 +1,27 @@
 import { describe, expect, it } from "vitest";
-import { isStanfordProfile } from "./auth-rules";
+import { stanfordEmail } from "./auth-rules";
 
-const ok = { email: "x@stanford.edu", email_verified: true, hd: "stanford.edu" };
+const google = (emailAddress: string, status = "verified", provider = "oauth_google") => ({
+  externalAccounts: [{ provider, emailAddress, verification: { status } }],
+});
 
-describe("isStanfordProfile", () => {
-  it("accepts a verified stanford.edu account", () => {
-    expect(isStanfordProfile(ok)).toBe(true);
-    expect(isStanfordProfile({ ...ok, email: "X@Stanford.EDU" })).toBe(true);
+describe("stanfordEmail", () => {
+  it("accepts a verified Google account at stanford.edu", () => {
+    expect(stanfordEmail(google("x@stanford.edu"))).toBe("x@stanford.edu");
+    expect(stanfordEmail(google("X@Stanford.EDU"))).toBe("x@stanford.edu");
   });
 
   it.each([
-    ["gmail", { ...ok, email: "x@gmail.com" }],
-    ["subdomain", { ...ok, email: "x@cs.stanford.edu" }],
-    ["suffix spoof", { ...ok, email: "x@stanford.edu.evil.com" }],
-    ["unverified email", { ...ok, email_verified: false }],
-    ["truthy but not true email_verified", { ...ok, email_verified: "true" }],
-    ["missing hd", { email: ok.email, email_verified: true }],
-    ["mismatched hd", { ...ok, hd: "gmail.com" }],
-    ["subdomain hd", { ...ok, hd: "cs.stanford.edu" }],
-    ["missing email", { email_verified: true, hd: "stanford.edu" }],
-    ["no profile", undefined],
-  ])("rejects %s", (_, profile) => {
-    expect(isStanfordProfile(profile)).toBe(false);
+    ["other domain", google("x@gmail.com")],
+    ["subdomain", google("x@cs.stanford.edu")],
+    ["lookalike domain", google("x@stanford.edu.evil.com")],
+    ["lookalike prefix", google("x@notstanford.edu")],
+    ["unverified", google("x@stanford.edu", "unverified")],
+    ["not Google", google("x@stanford.edu", "verified", "oauth_github")],
+    ["no verification", { externalAccounts: [{ provider: "oauth_google", emailAddress: "x@stanford.edu", verification: null }] }],
+    ["no external accounts", { externalAccounts: [] }],
+    ["no user", null],
+  ])("rejects %s", (_name, user) => {
+    expect(stanfordEmail(user)).toBeNull();
   });
 });

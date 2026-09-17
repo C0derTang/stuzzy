@@ -1,3 +1,4 @@
+import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
 import { Background } from "@/components/Background";
@@ -22,7 +23,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="en" className={`${geist.variable} h-full antialiased`}>
       <body className="h-full">
         <Background />
-        {children}
+        <ClerkProvider>{children}</ClerkProvider>
       </body>
     </html>
   );

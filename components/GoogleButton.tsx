@@ -46,6 +46,8 @@ export function GoogleButton() {
         <GoogleLogo />
         Continue with Google
       </button>
+      {/* Clerk mounts its bot-protection widget here when a first-time sign-up needs it. */}
+      <div id="clerk-captcha" />
       {failed && (
         <p role="alert" className="text-[13px] text-muted">
           Sign-in didn&rsquo;t work. Please try again.

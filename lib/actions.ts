@@ -1,6 +1,11 @@
 "use server";
 
-// STUB (Agent A). Server actions used by <form action={...}> in SignInCard and TopBar.
-export async function signInWithGoogle(): Promise<void> {}
+import { signIn, signOut } from "./auth";
 
-export async function signOutAction(): Promise<void> {}
+export async function signInWithGoogle(): Promise<void> {
+  await signIn("google", { redirectTo: "/" });
+}
+
+export async function signOutAction(): Promise<void> {
+  await signOut({ redirectTo: "/" });
+}

@@ -1,26 +1,74 @@
 @import "tailwindcss";
 
 /*
- * STUB (Agent C fills in values and bodies). The NAMES below are frozen: other files use them.
+ * The NAMES below are frozen: other files use them.
  *
  * Tokens:  --bg --fg --fg-muted --accent --accent-rgb --heat-rgb --glass-bg --glass-border
  *          --glass-highlight --glass-shadow --grid-line --radius
  * Classes: .glass  .glass-strong  .btn  .btn-primary  .app-shell  .app-body
+ * Extras:  --on-accent --glass-strong-bg --control-bg --control-hover --control-border; .btn-ghost .check
+ *
+ * --accent-rgb and --heat-rgb are space-separated triplets: rgb(var(--heat-rgb) / 0.4).
+ * Classes live in @layer components so Tailwind utilities on the same element win.
  */
 
 :root {
+  color-scheme: light dark;
+
   --bg: #f4f1fb;
   --fg: #1b1726;
-  --fg-muted: #6b6580;
+  --fg-muted: #635d78;
   --accent: #8c1515;
   --accent-rgb: 140 21 21;
-  --heat-rgb: 140 21 21;
-  --glass-bg: rgb(255 255 255 / 0.55);
+  --on-accent: #ffffff;
+  --heat-rgb: 72 88 214;
+  --glass-bg: rgb(255 255 255 / 0.52);
+  --glass-strong-bg: rgb(255 255 255 / 0.84);
+  --glass-solid-bg: rgb(250 248 254 / 0.94);
   --glass-border: rgb(255 255 255 / 0.7);
-  --glass-highlight: rgb(255 255 255 / 0.8);
+  --glass-highlight: rgb(255 255 255 / 0.85);
   --glass-shadow: rgb(30 20 60 / 0.12);
   --grid-line: rgb(30 20 60 / 0.08);
+  --control-bg: rgb(255 255 255 / 0.5);
+  --control-hover: rgb(255 255 255 / 0.85);
+  --control-border: rgb(30 20 60 / 0.1);
   --radius: 20px;
+
+  --bg-from: #f7f3fd;
+  --bg-to: #eef1fb;
+  --blob-1: rgb(196 181 253 / 0.6); /* lavender */
+  --blob-2: rgb(254 205 170 / 0.55); /* peach */
+  --blob-3: rgb(165 214 250 / 0.6); /* sky */
+  --blob-4: rgb(196 60 60 / 0.13); /* hint of cardinal */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e0b16;
+    --fg: #eeebf6;
+    --fg-muted: #a59fba;
+    --accent: #ff7070;
+    --accent-rgb: 255 112 112;
+    --on-accent: #2a0707;
+    --heat-rgb: 124 140 255;
+    --glass-bg: rgb(32 27 50 / 0.5);
+    --glass-strong-bg: rgb(36 31 56 / 0.86);
+    --glass-solid-bg: rgb(26 22 40 / 0.95);
+    --glass-border: rgb(255 255 255 / 0.1);
+    --glass-highlight: rgb(255 255 255 / 0.14);
+    --glass-shadow: rgb(0 0 0 / 0.45);
+    --grid-line: rgb(255 255 255 / 0.08);
+    --control-bg: rgb(255 255 255 / 0.07);
+    --control-hover: rgb(255 255 255 / 0.13);
+    --control-border: rgb(255 255 255 / 0.1);
+
+    --bg-from: #100c1c;
+    --bg-to: #0b0d18;
+    --blob-1: rgb(67 56 202 / 0.42); /* indigo */
+    --blob-2: rgb(134 39 110 / 0.34); /* plum */
+    --blob-3: rgb(17 120 130 / 0.32); /* teal */
+    --blob-4: rgb(170 40 50 / 0.2);
+  }
 }
 
 @theme inline {
@@ -29,29 +77,186 @@
   --color-fg: var(--fg);
   --color-muted: var(--fg-muted);
   --color-accent: var(--accent);
+  --color-on-accent: var(--on-accent);
+  --color-line: var(--grid-line);
+  --color-control: var(--control-bg);
 }
 
-body {
-  background: var(--bg);
-  color: var(--fg);
-  font-family: var(--font-sans), system-ui, sans-serif;
+@layer base {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(var(--heat-rgb) / 0.28) transparent;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+    line-height: 1.4;
+  }
+
+  :focus-visible {
+    outline: 2px solid rgb(var(--accent-rgb) / 0.7);
+    outline-offset: 2px;
+  }
 }
 
-.glass,
-.glass-strong {
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius);
+@layer components {
+  /* Static on purpose: anything moving under a backdrop-filter forces a re-blur per frame. */
+  .backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(55vmax 55vmax at 10% 4%, var(--blob-1), transparent 70%),
+      radial-gradient(50vmax 50vmax at 92% 10%, var(--blob-2), transparent 70%),
+      radial-gradient(60vmax 60vmax at 80% 96%, var(--blob-3), transparent 70%),
+      radial-gradient(45vmax 45vmax at 6% 98%, var(--blob-4), transparent 70%),
+      linear-gradient(160deg, var(--bg-from), var(--bg-to));
+  }
+
+  .glass,
+  .glass-strong {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius);
+    box-shadow:
+      inset 0 1px 0 var(--glass-highlight),
+      0 1px 2px var(--glass-shadow),
+      0 12px 40px -8px var(--glass-shadow);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    backdrop-filter: blur(24px) saturate(180%);
+  }
+
+  .glass-strong {
+    background: var(--glass-strong-bg);
+  }
+
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .glass,
+    .glass-strong {
+      background: var(--glass-solid-bg);
+    }
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 36px;
+    padding: 0 14px;
+    border: 1px solid var(--control-border);
+    border-radius: 999px;
+    background: var(--control-bg);
+    box-shadow: inset 0 1px 0 var(--glass-highlight);
+    color: var(--fg);
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    transition:
+      background-color 0.15s,
+      transform 0.15s,
+      filter 0.15s;
+  }
+
+  /* Borderless until hovered: icon buttons and quiet actions. */
+  .btn-ghost {
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .btn:hover {
+    background: var(--control-hover);
+  }
+
+  .btn:active {
+    transform: scale(0.97);
+  }
+
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  .btn-primary {
+    border-color: transparent;
+    background: var(--accent);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.25),
+      0 4px 14px -4px rgb(var(--accent-rgb) / 0.55);
+    color: var(--on-accent);
+  }
+
+  .btn-primary:hover {
+    background: var(--accent);
+    filter: brightness(1.08);
+  }
+
+  .check {
+    appearance: none;
+    display: grid;
+    place-content: center;
+    flex: none;
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    border: 1px solid var(--control-border);
+    border-radius: 5px;
+    background: var(--control-bg);
+    box-shadow: inset 0 1px 0 var(--glass-highlight);
+    cursor: pointer;
+    transition:
+      background-color 0.15s,
+      border-color 0.15s;
+  }
+
+  .check::before {
+    content: "";
+    width: 10px;
+    height: 10px;
+    background: var(--on-accent);
+    clip-path: polygon(14% 52%, 0 66%, 40% 100%, 100% 22%, 86% 10%, 38% 70%);
+    transform: scale(0);
+    transition: transform 0.12s;
+  }
+
+  .check:checked {
+    border-color: transparent;
+    background: var(--accent);
+  }
+
+  .check:checked::before {
+    transform: scale(1);
+  }
+
+  .app-shell {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    height: 100%;
+    padding: 12px;
+  }
+
+  .app-body {
+    display: flex;
+    flex: 1;
+    gap: 12px;
+    min-height: 0;
+  }
 }
 
-.app-shell {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
-.app-body {
-  display: flex;
-  flex: 1;
-  min-height: 0;
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
 }

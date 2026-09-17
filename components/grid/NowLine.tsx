@@ -1,0 +1,39 @@
+import { useSyncExternalStore } from "react";
+import { isSameDay } from "@/lib/time";
+import { DAYS_PER_WEEK } from "@/lib/types";
+
+const MINUTE = 60_000;
+
+function subscribe(onChange: () => void) {
+  const id = setInterval(onChange, MINUTE / 4);
+  return () => clearInterval(id);
+}
+const getNow = () => Math.floor(Date.now() / MINUTE) * MINUTE;
+const getServerNow = () => null;
+
+/**
+ * Current time, minute precision. Null on the server and while hydrating: the server's clock
+ * and time zone are not the viewer's, so nothing time-dependent may be in the server HTML.
+ */
+export function useNow(): number | null {
+  return useSyncExternalStore(subscribe, getNow, getServerNow);
+}
+
+/** Current-time marker; renders only when today is one of `days`. Lives inside the day-columns container. */
+export function NowLine({ days, now }: { days: Date[]; now: number | null }) {
+  if (now === null) return null;
+  const date = new Date(now);
+  const day = days.findIndex((d) => isSameDay(d, date));
+  if (day < 0) return null;
+  const rows = date.getHours() * 2 + date.getMinutes() / 30;
+  return (
+    <div
+      className="grid-now"
+      style={{
+        top: `calc(var(--row-h) * ${rows.toFixed(3)})`,
+        left: `${(day / DAYS_PER_WEEK) * 100}%`,
+        width: `${100 / DAYS_PER_WEEK}%`,
+      }}
+    />
+  );
+}

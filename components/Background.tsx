@@ -1,4 +1,4 @@
-// STUB (Agent C). Fixed, static gradient blobs behind everything.
+/** Fixed, static color field behind everything; styled by `.backdrop` in globals.css. */
 export function Background() {
-  return null;
+  return <div aria-hidden className="backdrop" />;
 }

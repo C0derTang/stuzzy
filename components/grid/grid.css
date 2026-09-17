@@ -1,0 +1,290 @@
+/* Week grid. Only the panel (and its sticky header strip) is glass; cells and blocks are flat for speed. */
+
+.grid-panel {
+  --row-h: 24px;
+  --gutter-w: 56px;
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.grid-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+@media (max-width: 767px) {
+  .grid-inner {
+    min-width: 640px;
+  }
+}
+
+.grid-head,
+.grid-body {
+  display: grid;
+  grid-template-columns: var(--gutter-w) minmax(0, 1fr);
+}
+
+/* A blur here only sees the grid content scrolling beneath it, which is exactly what it should frost. */
+.grid-head {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--grid-line);
+}
+
+.grid-days,
+.grid-cols {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.grid-dayhead {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 0 6px;
+  color: var(--fg-muted);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.grid-daynum {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  color: var(--fg);
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.grid-today {
+  color: var(--accent);
+}
+
+.grid-today .grid-daynum {
+  background: var(--accent);
+  color: #fff; /* on the accent fill in both themes */
+}
+
+.grid-gutter {
+  position: relative;
+}
+
+.grid-hour {
+  position: absolute;
+  right: 8px;
+  transform: translateY(-50%);
+  color: var(--fg-muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.grid-cols {
+  position: relative;
+  height: calc(var(--row-h) * 48);
+  /* Hour lines, then fainter half-hour lines. */
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(color-mix(in srgb, var(--grid-line) 45%, transparent) 1px, transparent 1px);
+  background-size: 100% calc(var(--row-h) * 2);
+  background-position:
+    0 -1px,
+    0 calc(var(--row-h) - 1px);
+  cursor: cell;
+  user-select: none;
+  -webkit-user-select: none;
+  /* Native scrolling both ways (the grid scrolls sideways on phones); taps toggle a slot. */
+  touch-action: pan-x pan-y;
+}
+
+.grid-col {
+  position: relative;
+  border-left: 1px solid var(--grid-line);
+}
+
+/* Heat */
+
+.heat-layer,
+.grid-own-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.heat-block {
+  position: absolute;
+  right: 3px;
+  left: 5px;
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 2px 5px;
+  overflow: hidden;
+  border-radius: 7px;
+  background: rgb(var(--heat-rgb) / var(--heat-a, 0.2));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18);
+  color: var(--fg-muted);
+  font-size: 10px;
+  line-height: 14px;
+  box-sizing: border-box;
+  transition: background-color 0.18s ease;
+}
+
+.heat-all {
+  background: rgb(var(--accent-rgb) / 0.78);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.28),
+    0 0 0 1px rgb(var(--accent-rgb) / 0.35),
+    0 2px 14px rgb(var(--accent-rgb) / 0.45);
+  color: #fff; /* on the accent fill in both themes */
+}
+
+.heat-label {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.heat-count {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
+
+/* Own slots: bar + outline so they read on top of any heat tint */
+
+.grid-own {
+  position: absolute;
+  right: 1px;
+  left: 1px;
+  box-sizing: border-box;
+  border-left: 2px solid var(--accent);
+  border-radius: 3px 8px 8px 3px;
+  background: rgb(var(--accent-rgb) / 0.05);
+  box-shadow: inset 0 0 0 1px rgb(var(--accent-rgb) / 0.4);
+}
+
+.grid-own-erasing {
+  border-left-style: dashed;
+  background: repeating-linear-gradient(
+    135deg,
+    rgb(var(--accent-rgb) / 0.22) 0 2px,
+    transparent 2px 7px
+  );
+  box-shadow: inset 0 0 0 1px rgb(var(--accent-rgb) / 0.2);
+  opacity: 0.45;
+}
+
+/* Now line */
+
+.grid-now {
+  position: absolute;
+  z-index: 2;
+  height: 2px;
+  margin-top: -1px;
+  background: var(--accent);
+  pointer-events: none;
+}
+
+.grid-now::before {
+  content: "";
+  position: absolute;
+  top: -4px;
+  left: -5px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+/* Empty hint */
+
+.grid-hint {
+  position: absolute;
+  top: 120px;
+  right: 0;
+  left: var(--gutter-w);
+  z-index: 2;
+  margin: 0;
+  padding: 0 16px;
+  color: var(--fg-muted);
+  font-size: 14px;
+  text-align: center;
+  pointer-events: none;
+}
+
+/* Hover popover (portaled to body) */
+
+/* Doubled up so it wins over whatever positioning .glass-strong brings. */
+.grid-popover.glass-strong {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 50;
+  visibility: hidden; /* SlotPopover places it, then reveals it */
+  width: 220px;
+  padding: 12px 14px;
+  font-size: 13px;
+  pointer-events: none;
+}
+
+.grid-popover-time {
+  font-weight: 600;
+}
+
+.grid-popover-group {
+  margin-top: 10px;
+  color: var(--fg-muted);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.grid-popover-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.grid-popover-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.grid-popover-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.grid-popover-busy {
+  color: var(--fg-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .heat-block {
+    transition: none;
+  }
+}

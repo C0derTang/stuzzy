@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!-- Chunky shapes only: this has to read at 16px in a browser tab. -->
+  <rect x="13.9" y="19" width="4.2" height="10.5" rx="2.1" fill="#7a4a24" />
+  <g fill="#2f7d4f">
+    <circle cx="16" cy="11" r="8.2" />
+    <circle cx="8.6" cy="16.8" r="6.2" />
+    <circle cx="23.4" cy="16.8" r="6.2" />
+    <rect x="7.6" y="14" width="16.8" height="8" rx="4" />
+  </g>
+  <circle cx="12.7" cy="8.6" r="2.4" fill="#4aa46c" />
+</svg>

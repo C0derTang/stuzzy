@@ -1,4 +1,4 @@
-import { DAYS_PER_WEEK, SLOT_MS } from "./types";
+import { DAYS_PER_WEEK, MINUTE_MS, MINUTES_PER_DAY, type Interval } from "./types";
 
 // All calendar math goes through local-time Date constructors and setDate so that
 // 23- and 25-hour DST days stay correct. Never add milliseconds to move between days.
@@ -26,33 +26,39 @@ export function weekRange(weekStart: Date): { from: number; to: number } {
   return { from: weekStart.getTime(), to: addWeeks(weekStart, 1).getTime() };
 }
 
-/**
- * Instant of grid cell (`day`, `row`), or null when that wall-clock time does not exist
- * (the skipped hour on a spring-forward day). Such cells are inert.
- */
-export function cellToInstant(weekStart: Date, day: number, row: number): number | null {
-  const d = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + day, 0, 30 * row);
-  if (d.getHours() * 2 + d.getMinutes() / 30 !== row) return null;
-  return d.getTime();
+/** Instant of wall-clock `minutes` past midnight on `day` (0-6) of the week. */
+export function instantAt(weekStart: Date, day: number, minutes: number): number {
+  return new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + day, 0, minutes).getTime();
 }
 
-/**
- * Grid cell of an instant within the visible week, or null when it is outside the week or
- * not reachable from the grid (the repeated hour on a fall-back day).
- */
-export function instantToCell(weekStart: Date, ms: number): { day: number; row: number } | null {
+/** Day index and wall-clock minutes of an instant inside the visible week, or null when outside it. */
+export function dayMinutes(weekStart: Date, ms: number): { day: number; min: number } | null {
   const d = new Date(ms);
-  const midnight = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const midnight = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
   for (let day = 0; day < DAYS_PER_WEEK; day++) {
-    if (addDays(weekStart, day).getTime() !== midnight.getTime()) continue;
-    const row = d.getHours() * 2 + Math.floor(d.getMinutes() / 30);
-    return cellToInstant(weekStart, day, row) === ms ? { day, row } : null;
+    if (addDays(weekStart, day).getTime() === midnight) return { day, min: d.getHours() * 60 + d.getMinutes() };
   }
   return null;
 }
 
-export function isAligned(ms: number): boolean {
-  return Number.isInteger(ms) && ms % SLOT_MS === 0;
+export type DayPart = { day: number; startMin: number; endMin: number };
+
+/** The pieces of an interval that fall inside the week, one per local day, in wall-clock minutes. */
+export function splitByDay(weekStart: Date, { start, end }: Interval): DayPart[] {
+  const parts: DayPart[] = [];
+  for (let day = 0; day < DAYS_PER_WEEK; day++) {
+    const dayStart = instantAt(weekStart, day, 0);
+    const dayEnd = instantAt(weekStart, day + 1, 0);
+    if (end <= dayStart || start >= dayEnd) continue;
+    const startMin = start <= dayStart ? 0 : dayMinutes(weekStart, start)!.min;
+    const endMin = end >= dayEnd ? MINUTES_PER_DAY : dayMinutes(weekStart, end)!.min;
+    if (startMin < endMin) parts.push({ day, startMin, endMin });
+  }
+  return parts;
+}
+
+export function isMinuteAligned(ms: number): boolean {
+  return Number.isInteger(ms) && ms % MINUTE_MS === 0;
 }
 
 export function isSameDay(a: Date, b: Date): boolean {
@@ -70,11 +76,16 @@ export function formatWeekLabel(weekStart: Date): string {
   return `${month(weekStart)} ${weekStart.getDate()} – ${tail}, ${end.getFullYear()}`;
 }
 
-/** Row label for the time gutter: "12 AM", "1 PM". Meant for even (on-the-hour) rows. */
-export function formatRow(row: number): string {
-  const hour = Math.floor(row / 2) % 24;
-  const minutes = row % 2 ? ":30" : "";
-  return `${hour % 12 === 0 ? 12 : hour % 12}${minutes} ${hour < 12 ? "AM" : "PM"}`;
+/** Gutter label for an hour 0-23: "12 AM", "1 PM". */
+export function formatHour(hour: number): string {
+  return `${hour % 12 === 0 ? 12 : hour % 12} ${hour < 12 ? "AM" : "PM"}`;
+}
+
+/** "2:05 PM" style label for wall-clock minutes past midnight. */
+export function formatMinutes(min: number): string {
+  const hour = Math.floor(min / 60) % 24;
+  const mm = String(min % 60).padStart(2, "0");
+  return `${hour % 12 === 0 ? 12 : hour % 12}:${mm} ${hour < 12 ? "AM" : "PM"}`;
 }
 
 /** "Tue 2:00 – 3:30 PM" style label for an instant range within one day. */

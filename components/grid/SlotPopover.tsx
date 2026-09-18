@@ -1,8 +1,8 @@
 import { useLayoutEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Avatar } from "@/components/Avatar";
-import { cellToInstant, formatRange } from "@/lib/time";
-import { SLOT_MS, type Run, type User } from "@/lib/types";
+import { formatRange, instantAt } from "@/lib/time";
+import type { Run, User } from "@/lib/types";
 
 /** Viewport coordinates: the hovered day column's horizontal edges and the pointer's y. */
 export type PopoverAnchor = { left: number; right: number; y: number };
@@ -28,9 +28,8 @@ export function SlotPopover({ run, anchor, weekStart, users, included }: Props) 
     el.style.visibility = "visible";
   }, [anchor, run]);
 
-  const start = cellToInstant(weekStart, run.day, run.startRow);
-  const last = cellToInstant(weekStart, run.day, run.endRow - 1);
-  if (start === null || last === null) return null;
+  const start = instantAt(weekStart, run.day, run.startMin);
+  const end = instantAt(weekStart, run.day, run.endMin);
 
   const isFree = new Set(run.free);
   const free = users.filter((u) => isFree.has(u.id));
@@ -38,7 +37,7 @@ export function SlotPopover({ run, anchor, weekStart, users, included }: Props) 
 
   return createPortal(
     <div ref={ref} className="glass-strong grid-popover" role="tooltip">
-      <div className="grid-popover-time">{formatRange(start, last + SLOT_MS)}</div>
+      <div className="grid-popover-time">{formatRange(start, end)}</div>
       <div className="grid-popover-group">Free · {free.length}</div>
       <ul className="grid-popover-list">
         {free.map((u) => (

@@ -3,6 +3,7 @@
 import { useCallback } from "react";
 import useSWR from "swr";
 import { weekRange } from "./time";
+import { applyPatch } from "./intervals";
 import type { SlotsPatch, SlotsResponse } from "./types";
 
 export type UseSlots = {
@@ -30,27 +31,32 @@ async function postPatch(patch: SlotsPatch): Promise<undefined> {
   if (!res.ok) throw new Error(`POST /api/slots failed: ${res.status}`);
 }
 
-function applyPatch(
+function applyOptimistic(
   cur: SlotsResponse | undefined,
   meId: string,
   patch: SlotsPatch,
-  from: number,
-  to: number,
 ): SlotsResponse {
-  const base = cur ?? { users: [], slots: {} };
-  const mine = new Set(base.slots[meId]);
-  for (const ms of patch.add) if (ms >= from && ms < to) mine.add(ms);
-  for (const ms of patch.remove) mine.delete(ms);
-  return { ...base, slots: { ...base.slots, [meId]: [...mine].sort((a, b) => a - b) } };
+  const base = cur ?? { users: [], intervals: {} };
+  return {
+    ...base,
+    intervals: {
+      ...base.intervals,
+      [meId]: applyPatch(base.intervals[meId] ?? [], patch),
+    },
+  };
 }
 
 export function useSlots(weekStart: Date, meId: string): UseSlots {
   const { from, to } = weekRange(weekStart);
-  const { data, error, isLoading, mutate } = useSWR(`/api/slots?from=${from}&to=${to}`, fetchSlots, {
-    refreshInterval: 15000,
-    revalidateOnFocus: true,
-    keepPreviousData: true,
-  });
+  const { data, error, isLoading, mutate } = useSWR(
+    `/api/slots?from=${from}&to=${to}`,
+    fetchSlots,
+    {
+      refreshInterval: 15000,
+      revalidateOnFocus: true,
+      keepPreviousData: true,
+    },
+  );
 
   const commit = useCallback(
     async (patch: SlotsPatch) => {
@@ -58,7 +64,8 @@ export function useSlots(weekStart: Date, meId: string): UseSlots {
       try {
         await mutate(postPatch(patch), {
           // Build on what is displayed, not the committed cache, so back-to-back drags compose.
-          optimisticData: (_committed, displayed) => applyPatch(displayed, meId, patch, from, to),
+          optimisticData: (_committed, displayed) =>
+            applyOptimistic(displayed, meId, patch),
           populateCache: false,
           revalidate: true,
           rollbackOnError: true,
@@ -68,7 +75,7 @@ export function useSlots(weekStart: Date, meId: string): UseSlots {
         console.error("Saving availability failed", err);
       }
     },
-    [mutate, meId, from, to],
+    [mutate, meId],
   );
 
   return { data, error, isLoading, commit };

@@ -250,6 +250,154 @@
     gap: 12px;
     min-height: 0;
   }
+
+  /* Mobile input box: a bottom sheet over the grid, wrapper is md:hidden. */
+  .add-sheet {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    z-index: 40;
+    padding: 16px;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    background: var(--glass-strong-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius);
+    box-shadow:
+      inset 0 1px 0 var(--glass-highlight),
+      0 1px 2px var(--glass-shadow),
+      0 16px 48px -8px var(--glass-shadow);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    backdrop-filter: blur(24px) saturate(180%);
+  }
+
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .add-sheet {
+      background: var(--glass-solid-bg);
+    }
+  }
+
+  /* AddTime: day chips and time inputs. */
+  .addtime-days {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 4px;
+  }
+
+  .addtime-chip {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    min-width: 0;
+    height: 44px;
+    padding: 0;
+    border: 1px solid var(--control-border);
+    border-radius: 10px;
+    background: var(--control-bg);
+    box-shadow: inset 0 1px 0 var(--glass-highlight);
+    color: var(--fg);
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1;
+    cursor: pointer;
+    user-select: none;
+    transition:
+      background-color 0.15s,
+      border-color 0.15s,
+      color 0.15s,
+      transform 0.15s;
+  }
+
+  .addtime-chip:hover {
+    background: var(--control-hover);
+  }
+
+  .addtime-chip:active {
+    transform: scale(0.96);
+  }
+
+  .addtime-chip-date {
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--fg-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .addtime-chip.is-today .addtime-chip-date {
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  .addtime-chip[aria-pressed="true"] {
+    border-color: transparent;
+    background: var(--accent);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.25),
+      0 4px 14px -4px rgb(var(--accent-rgb) / 0.55);
+    color: var(--on-accent);
+  }
+
+  .addtime-chip[aria-pressed="true"]:hover {
+    background: var(--accent);
+    filter: brightness(1.08);
+  }
+
+  .addtime-chip[aria-pressed="true"] .addtime-chip-date {
+    color: var(--on-accent);
+    opacity: 0.8;
+  }
+
+  .addtime-input {
+    width: 100%;
+    min-width: 0;
+    height: 36px;
+    padding: 0 10px;
+    border: 1px solid var(--control-border);
+    border-radius: 10px;
+    background: var(--control-bg);
+    box-shadow: inset 0 1px 0 var(--glass-highlight);
+    color: var(--fg);
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    transition: background-color 0.15s;
+  }
+
+  .addtime-input:hover {
+    background: var(--control-hover);
+  }
+
+  .addtime-input[aria-invalid="true"] {
+    border-color: rgb(var(--accent-rgb) / 0.6);
+  }
+
+  .addtime-input::-webkit-calendar-picker-indicator {
+    opacity: 0.55;
+    cursor: pointer;
+  }
+
+  /* Reserve one line so the form does not jump when a message appears. */
+  .addtime-status {
+    min-height: 17px;
+    margin: 0;
+    line-height: 17px;
+  }
+
+  .addtime-notice {
+    display: inline-block;
+    animation: addtime-fade 2s ease forwards;
+  }
+}
+
+@keyframes addtime-fade {
+  0%,
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

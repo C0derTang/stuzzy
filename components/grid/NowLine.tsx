@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { isSameDay } from "@/lib/time";
 import { DAYS_PER_WEEK } from "@/lib/types";
+import { minuteTop } from "./HeatLayer";
 
 const MINUTE = 60_000;
 
@@ -25,12 +26,12 @@ export function NowLine({ days, now }: { days: Date[]; now: number | null }) {
   const date = new Date(now);
   const day = days.findIndex((d) => isSameDay(d, date));
   if (day < 0) return null;
-  const rows = date.getHours() * 2 + date.getMinutes() / 30;
+  const minutes = date.getHours() * 60 + date.getMinutes();
   return (
     <div
       className="grid-now"
       style={{
-        top: `calc(var(--row-h) * ${rows.toFixed(3)})`,
+        top: minuteTop(minutes),
         left: `${(day / DAYS_PER_WEEK) * 100}%`,
         width: `${100 / DAYS_PER_WEEK}%`,
       }}

@@ -1,52 +1,68 @@
 import { useEffect, useRef, useState, type PointerEvent } from "react";
-import { cellToInstant } from "@/lib/time";
-import { DAYS_PER_WEEK, ROWS_PER_DAY, type SlotsPatch } from "@/lib/types";
+import { covers } from "@/lib/intervals";
+import { instantAt } from "@/lib/time";
+import { DAYS_PER_WEEK, MINUTES_PER_DAY, SNAP_MIN, type Interval, type SlotsPatch } from "@/lib/types";
 
-export type Cell = { day: number; row: number };
+/** A day column and wall-clock minutes from its midnight; snapped cells start on a `SNAP_MIN` boundary. */
+export type Cell = { day: number; min: number };
 export type Draft = { anchor: Cell; current: Cell; mode: "paint" | "erase" };
 
 const TAP_SLOP = 10;
 
 const clamp = (n: number, max: number) => Math.min(max, Math.max(0, n));
 
-/** Grid cell under a viewport point, clamped to the grid. `el` is the day-columns container. */
-export function cellAt(el: Element, clientX: number, clientY: number): Cell {
+/** Exact (unsnapped) day and minute under a viewport point, clamped to the grid. `el` is the day-columns container. */
+export function pointAt(el: Element, clientX: number, clientY: number): Cell {
   const rect = el.getBoundingClientRect();
   return {
     day: clamp(Math.floor(((clientX - rect.left) / rect.width) * DAYS_PER_WEEK), DAYS_PER_WEEK - 1),
-    row: clamp(Math.floor(((clientY - rect.top) / rect.height) * ROWS_PER_DAY), ROWS_PER_DAY - 1),
+    min: clamp(Math.floor(((clientY - rect.top) / rect.height) * MINUTES_PER_DAY), MINUTES_PER_DAY - 1),
   };
 }
 
+/** The `SNAP_MIN`-minute cell under a viewport point. */
+export function cellAt(el: Element, clientX: number, clientY: number): Cell {
+  const { day, min } = pointAt(el, clientX, clientY);
+  return { day, min: clamp(Math.floor(min / SNAP_MIN) * SNAP_MIN, MINUTES_PER_DAY - SNAP_MIN) };
+}
+
+/** The dragged rectangle: inclusive day range, half-open minute range. */
 export function draftBounds({ anchor, current }: Pick<Draft, "anchor" | "current">) {
   return {
     day0: Math.min(anchor.day, current.day),
     day1: Math.max(anchor.day, current.day),
-    row0: Math.min(anchor.row, current.row),
-    row1: Math.max(anchor.row, current.row),
+    min0: Math.min(anchor.min, current.min),
+    min1: Math.max(anchor.min, current.min) + SNAP_MIN,
   };
 }
 
-type Options = { weekStart: Date; mySlots: Set<number>; onCommit: (patch: SlotsPatch) => void };
+/** One interval per day of the dragged rectangle. */
+export function draftIntervals(weekStart: Date, draft: Pick<Draft, "anchor" | "current">): Interval[] {
+  const { day0, day1, min0, min1 } = draftBounds(draft);
+  const out: Interval[] = [];
+  for (let day = day0; day <= day1; day++) {
+    const start = instantAt(weekStart, day, min0);
+    const end = instantAt(weekStart, day, min1);
+    if (start < end) out.push({ start, end });
+  }
+  return out;
+}
 
-/** when2meet-style rectangle painting for mouse/pen, single-slot tap toggle for touch. */
-export function usePaint({ weekStart, mySlots, onCommit }: Options) {
+type Options = { weekStart: Date; mine: Interval[]; onCommit: (patch: SlotsPatch) => void };
+
+/** when2meet-style rectangle painting for mouse/pen, single-cell tap toggle for touch. */
+export function usePaint({ weekStart, mine, onCommit }: Options) {
   const [draft, setDraft] = useState<Draft | null>(null);
   const drag = useRef<Draft | null>(null);
   const tap = useRef<{ x: number; y: number } | null>(null);
 
+  const modeAt = (cell: Cell): Draft["mode"] =>
+    covers(mine, instantAt(weekStart, cell.day, cell.min)) ? "erase" : "paint";
+
+  // One patch per gesture; the optimistic layer and the server do the set algebra against what is stored.
   const commit = (anchor: Cell, current: Cell, mode: Draft["mode"]) => {
-    const { day0, day1, row0, row1 } = draftBounds({ anchor, current });
-    const patch: SlotsPatch = { add: [], remove: [] };
-    for (let day = day0; day <= day1; day++) {
-      for (let row = row0; row <= row1; row++) {
-        const ms = cellToInstant(weekStart, day, row);
-        if (ms === null) continue;
-        if (mode === "paint" && !mySlots.has(ms)) patch.add.push(ms);
-        if (mode === "erase" && mySlots.has(ms)) patch.remove.push(ms);
-      }
-    }
-    onCommit(patch);
+    const ranges = draftIntervals(weekStart, { anchor, current });
+    onCommit(mode === "paint" ? { add: ranges, remove: [] } : { add: [], remove: ranges });
   };
 
   const cancel = () => {
@@ -77,8 +93,7 @@ export function usePaint({ weekStart, mySlots, onCommit }: Options) {
     if (e.button !== 0) return;
     e.currentTarget.setPointerCapture(e.pointerId);
     const anchor = cellAt(e.currentTarget, e.clientX, e.clientY);
-    const ms = cellToInstant(weekStart, anchor.day, anchor.row);
-    const next: Draft = { anchor, current: anchor, mode: ms !== null && mySlots.has(ms) ? "erase" : "paint" };
+    const next: Draft = { anchor, current: anchor, mode: modeAt(anchor) };
     drag.current = next;
     setDraft(next);
   };
@@ -88,7 +103,7 @@ export function usePaint({ weekStart, mySlots, onCommit }: Options) {
     if (!d) return;
     if (e.buttons === 0) return cancel(); // the pointerup was lost (e.g. context menu)
     const current = cellAt(e.currentTarget, e.clientX, e.clientY);
-    if (current.day === d.current.day && current.row === d.current.row) return;
+    if (current.day === d.current.day && current.min === d.current.min) return;
     const next = { ...d, current };
     drag.current = next;
     setDraft(next);
@@ -100,8 +115,7 @@ export function usePaint({ weekStart, mySlots, onCommit }: Options) {
       tap.current = null;
       if (!start || Math.hypot(e.clientX - start.x, e.clientY - start.y) > TAP_SLOP) return;
       const cell = cellAt(e.currentTarget, e.clientX, e.clientY);
-      const ms = cellToInstant(weekStart, cell.day, cell.row);
-      if (ms !== null) commit(cell, cell, mySlots.has(ms) ? "erase" : "paint");
+      commit(cell, cell, modeAt(cell));
       return;
     }
     const d = drag.current;

@@ -1,7 +1,7 @@
-import { cellToInstant } from "./time";
-import { SLOT_MS, type BestTime, type Run } from "./types";
+import { instantAt } from "./time";
+import type { BestTime, Run } from "./types";
 
-const MIN_ROWS = 2;
+const MIN_MINUTES = 60;
 const MIN_PEOPLE = 2;
 
 /**
@@ -18,24 +18,22 @@ export function bestTimes(runs: Run[], weekStart: Date, now: number, limit = 5):
 
   const windows = new Map<string, BestTime>();
   for (const [day, dayRuns] of byDay) {
-    dayRuns.sort((a, b) => a.startRow - b.startRow);
+    dayRuns.sort((a, b) => a.startMin - b.startMin);
     dayRuns.forEach((seed, i) => {
       if (seed.free.length < MIN_PEOPLE) return;
       // Grow through touching neighbors in which everyone from the seed is still free.
       const covers = (run: Run) => seed.free.every((id) => run.free.includes(id));
       let lo = i;
       let hi = i;
-      while (lo > 0 && dayRuns[lo - 1].endRow === dayRuns[lo].startRow && covers(dayRuns[lo - 1])) lo--;
-      while (hi < dayRuns.length - 1 && dayRuns[hi].endRow === dayRuns[hi + 1].startRow && covers(dayRuns[hi + 1])) hi++;
+      while (lo > 0 && dayRuns[lo - 1].endMin === dayRuns[lo].startMin && covers(dayRuns[lo - 1])) lo--;
+      while (hi < dayRuns.length - 1 && dayRuns[hi].endMin === dayRuns[hi + 1].startMin && covers(dayRuns[hi + 1])) hi++;
 
-      const startRow = dayRuns[lo].startRow;
-      const endRow = dayRuns[hi].endRow;
-      if (endRow - startRow < MIN_ROWS) return;
-      const start = cellToInstant(weekStart, day, startRow);
-      const last = cellToInstant(weekStart, day, endRow - 1);
-      if (start === null || last === null) return;
-      // Midnight and DST-skipped end rows have no instant of their own.
-      const end = cellToInstant(weekStart, day, endRow) ?? last + SLOT_MS;
+      const startMin = dayRuns[lo].startMin;
+      const endMin = dayRuns[hi].endMin;
+      if (endMin - startMin < MIN_MINUTES) return;
+      const start = instantAt(weekStart, day, startMin);
+      // endMin may be 1440, which instantAt rolls over to the next midnight.
+      const end = instantAt(weekStart, day, endMin);
       if (end <= now) return;
       windows.set(`${start}:${end}:${seed.free.length}`, { start, end, free: seed.free });
     });

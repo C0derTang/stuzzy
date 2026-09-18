@@ -1,22 +1,59 @@
 // Dev data: five fake users with overlapping free time for this week and next. `pnpm db:seed`
 import { inArray } from "drizzle-orm";
-import { slots, users } from "../lib/db/schema";
-import { addWeeks, cellToInstant, startOfWeek } from "../lib/time";
+import { intervals, users } from "../lib/db/schema";
+import { addWeeks, instantAt, startOfWeek } from "../lib/time";
 
 if (process.env.NODE_ENV === "production") throw new Error("refusing to seed in production");
 process.loadEnvFile(".env.local");
 
-// [day (0 = Sunday), start hour, end hour]. Everyone is free Tue 12-1:30, Thu 5-6:30 and Sat 3-4.
-type Block = [day: number, from: number, to: number];
+// [day (0 = Sunday), "H:MM" start, "H:MM" end]. Everyone is free Tue 12:00-13:30, Thu 17:00-18:30 and Sat 15:00-16:00.
+type Block = [day: number, from: string, to: string];
 const people: Record<string, Block[]> = {
-  alice: [[0, 19, 21], [1, 10, 12], [2, 12, 14], [3, 15, 18], [4, 17, 20], [5, 13, 16], [6, 14, 17]],
-  ben: [[0, 10, 12], [1, 11, 13], [2, 11.5, 13.5], [3, 16, 19], [4, 16, 18.5], [5, 14, 17], [6, 13, 16]],
-  cam: [[0, 19, 22], [1, 9, 11.5], [2, 12, 15], [3, 19, 22], [4, 17, 21], [5, 10, 12], [6, 14, 18]],
-  dana: [[0, 20, 23], [1, 11, 12], [2, 10, 13.5], [3, 15, 17], [4, 15, 19], [5, 14, 15.5], [6, 11, 16]],
-  eli: [[2, 12, 13.5], [4, 17, 18.5], [6, 15, 16]], // sparse
+  alice: [
+    [0, "18:45", "21:10"],
+    [1, "9:05", "10:40"],
+    [2, "11:40", "14:20"],
+    [3, "15:10", "18:00"],
+    [4, "16:30", "20:15"],
+    [5, "13:20", "15:00"],
+    [6, "14:00", "17:30"],
+  ],
+  ben: [
+    [0, "10:15", "12:00"],
+    [1, "11:00", "13:10"],
+    [2, "11:55", "13:35"],
+    [3, "16:20", "19:00"],
+    [4, "16:00", "18:50"],
+    [5, "14:05", "17:00"],
+    [6, "12:45", "16:20"],
+  ],
+  cam: [
+    [0, "19:00", "22:30"],
+    [1, "9:00", "11:25"],
+    [2, "12:00", "15:05"],
+    [3, "19:15", "22:00"],
+    [4, "17:00", "21:30"],
+    [5, "10:10", "12:00"],
+    [6, "13:50", "18:00"],
+  ],
+  dana: [
+    [0, "20:00", "23:00"],
+    [1, "10:50", "12:15"],
+    [2, "10:30", "13:45"],
+    [3, "15:00", "17:05"],
+    [4, "15:35", "19:00"],
+    [5, "13:20", "15:30"],
+    [6, "11:00", "16:00"],
+  ],
+  eli: [[0, "20:30", "21:00"], [2, "12:00", "13:30"], [4, "17:00", "18:30"], [6, "15:00", "16:00"]], // sparse
 };
-// Next week, these people run an hour later on Sun/Mon/Wed/Fri so the two weeks differ.
+// Next week, these people run an hour later on Mon/Wed/Fri so the two weeks differ.
 const shifted = new Set(["ben", "dana"]);
+
+const minutes = (hhmm: string) => {
+  const [h, m] = hhmm.split(":").map(Number);
+  return h * 60 + m;
+};
 
 async function main() {
   const { db } = await import("../lib/db"); // after loadEnvFile: the client reads DATABASE_URL on import
@@ -27,24 +64,25 @@ async function main() {
     const row = { email: `dev-${n}@example.invalid`, name: n[0].toUpperCase() + n.slice(1), image: null };
     await db.insert(users).values({ id: `dev-${n}`, ...row }).onConflictDoUpdate({ target: users.id, set: row });
   }
-  await db.delete(slots).where(inArray(slots.userId, ids));
+  await db.delete(intervals).where(inArray(intervals.userId, ids));
 
   const thisWeek = startOfWeek(new Date());
-  const rows: (typeof slots.$inferInsert)[] = [];
+  const rows: (typeof intervals.$inferInsert)[] = [];
   for (const week of [0, 1]) {
     const weekStart = addWeeks(thisWeek, week);
     for (const n of names) {
       for (const [day, from, to] of people[n]) {
-        const shift = week === 1 && shifted.has(n) && day % 2 === 1 ? 1 : 0;
-        for (let row = (from + shift) * 2; row < (to + shift) * 2; row++) {
-          const ms = cellToInstant(weekStart, day, row);
-          if (ms !== null) rows.push({ userId: `dev-${n}`, start: new Date(ms) });
-        }
+        const shift = week === 1 && shifted.has(n) && day % 2 === 1 ? 60 : 0;
+        rows.push({
+          userId: `dev-${n}`,
+          start: new Date(instantAt(weekStart, day, minutes(from) + shift)),
+          end: new Date(instantAt(weekStart, day, minutes(to) + shift)),
+        });
       }
     }
   }
-  await db.insert(slots).values(rows).onConflictDoNothing();
-  console.log(`seeded ${ids.length} users, ${rows.length} slots from ${thisWeek.toDateString()}`);
+  await db.insert(intervals).values(rows);
+  console.log(`seeded ${ids.length} users, ${rows.length} intervals from ${thisWeek.toDateString()}`);
 }
 
 main();

@@ -1,4 +1,4 @@
-import { index, pgTable, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
+import { index, integer, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
   id: text("id").primaryKey(), // Google `sub`
@@ -7,14 +7,17 @@ export const users = pgTable("users", {
   image: text("image"),
 });
 
-// One row = one free 30-minute slot.
-export const slots = pgTable(
-  "slots",
+// One row = one free range [start, end), minute-aligned. Rows of a user never overlap or touch:
+// the API rewrites them merged on every patch.
+export const intervals = pgTable(
+  "intervals",
   {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
     userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     start: timestamp("start", { withTimezone: true, mode: "date" }).notNull(),
+    end: timestamp("end", { withTimezone: true, mode: "date" }).notNull(),
   },
-  (t) => [primaryKey({ columns: [t.userId, t.start] }), index("slots_start_idx").on(t.start)],
+  (t) => [index("intervals_user_start_idx").on(t.userId, t.start)],
 );

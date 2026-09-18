@@ -13,6 +13,8 @@ export type TopBarProps = {
   onPrev: () => void;
   onNext: () => void;
   onToday: () => void;
+  /** Mobile only (`md:hidden` button): toggles the add-time sheet. */
+  onAdd: () => void;
 };
 
 function Chevron({ dir }: { dir: "left" | "right" }) {
@@ -47,6 +49,7 @@ export function TopBar({
   onPrev,
   onNext,
   onToday,
+  onAdd,
 }: TopBarProps) {
   const { signOut } = useClerk();
   useEffect(() => {
@@ -104,6 +107,22 @@ export function TopBar({
         {formatWeekLabel(weekStart)}
       </h1>
       <div className="ml-auto flex shrink-0 items-center gap-2.5">
+        <button
+          type="button"
+          className="btn btn-ghost w-9 px-0 md:hidden"
+          aria-label="Add free time"
+          title="Add free time"
+          onClick={onAdd}
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+            <path
+              d="M8 3v10M3 8h10"
+              stroke="currentColor"
+              strokeWidth="1.75"
+              strokeLinecap="round"
+            />
+          </svg>
+        </button>
         <span className="hidden sm:inline-flex">
           <Avatar user={me} size={28} />
         </span>

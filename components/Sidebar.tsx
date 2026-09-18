@@ -1,9 +1,10 @@
 "use client";
 
 import type { CSSProperties, ReactNode } from "react";
+import { AddTime } from "@/components/AddTime";
 import { Avatar } from "@/components/Avatar";
 import { BestTimes } from "@/components/BestTimes";
-import type { BestTime, User } from "@/lib/types";
+import type { BestTime, SlotsPatch, User } from "@/lib/types";
 
 export type SidebarProps = {
   me: User;
@@ -14,6 +15,9 @@ export type SidebarProps = {
   activeIds: Set<string>;
   onToggle: (userId: string) => void;
   bestTimes: BestTime[];
+  /** For the AddTime box at the top of the sidebar. */
+  weekStart: Date;
+  onCommit: (patch: SlotsPatch) => void;
 };
 
 // Mirrors HeatLayer: alpha = 0.1 + 0.45 * (free / total).
@@ -37,11 +41,14 @@ function LegendRow({ swatch, label }: { swatch: CSSProperties; label: string }) 
   );
 }
 
-export function Sidebar({ me, users, included, activeIds, onToggle, bestTimes }: SidebarProps) {
+export function Sidebar({ me, users, included, activeIds, onToggle, bestTimes, weekStart, onCommit }: SidebarProps) {
   const people = [...users.filter((u) => u.id === me.id), ...users.filter((u) => u.id !== me.id)];
 
   return (
     <aside className="glass hidden w-[260px] shrink-0 flex-col gap-6 overflow-y-auto p-4 md:flex">
+      {/* Carries its own "Add free time" heading, styled like the section titles below. */}
+      <AddTime weekStart={weekStart} onCommit={onCommit} />
+
       <Section title="People">
         {people.length === 0 ? (
           <p className="text-[13px] text-muted">No one here yet</p>

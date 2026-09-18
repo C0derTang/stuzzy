@@ -1,74 +1,77 @@
 "use client";
 
 import { useLayoutEffect, useMemo, useRef, useState, type PointerEvent } from "react";
-import { cellToInstant, formatRow, instantToCell, isSameDay, weekDays } from "@/lib/time";
-import { DAYS_PER_WEEK, ROWS_PER_DAY, type Run, type SlotsPatch, type User } from "@/lib/types";
-import { HeatLayer, rowBox } from "./HeatLayer";
+import { clip, subtract, union } from "@/lib/intervals";
+import { formatHour, formatMinutes, isSameDay, splitByDay, weekDays, weekRange } from "@/lib/time";
+import { DAYS_PER_WEEK, MINUTES_PER_DAY, type Interval, type Run, type SlotsPatch, type User } from "@/lib/types";
+import { HeatLayer, minuteBox, minutesToPx } from "./HeatLayer";
 import { NowLine, useNow } from "./NowLine";
 import { SlotPopover, type PopoverAnchor } from "./SlotPopover";
-import { cellAt, draftBounds, usePaint, type Cell, type Draft } from "./usePaint";
+import { draftIntervals, pointAt, usePaint, type Cell, type Draft } from "./usePaint";
 import "./grid.css";
 
 export type WeekGridProps = {
   weekStart: Date;
-  me: User;
   users: User[];
   /** Users counted in the heatmap; `included.size` is the "everyone" total. */
   included: Set<string>;
   runs: Run[];
-  /** The signed-in user's free slots (epoch ms) in the visible week. */
-  mySlots: Set<number>;
+  /** The signed-in user's free intervals (sorted, merged; may extend past the week). */
+  mine: Interval[];
   /** Called once per finished drag or tap. */
   onCommit: (patch: SlotsPatch) => void;
 };
 
-const HOUR_ROWS = Array.from({ length: ROWS_PER_DAY / 2 - 1 }, (_, i) => (i + 1) * 2);
-const FIRST_VISIBLE_ROW = 16; // 8 AM
+const HOURS = Array.from({ length: 23 }, (_, i) => i + 1);
+const FIRST_VISIBLE_MIN = 8 * 60;
+/** An own block shows its exact times once it is at least this tall. */
+const OWN_LABEL_MIN_PX = 22;
 
-type OwnBlock = { startRow: number; endRow: number; erasing: boolean };
+type OwnBlock = { startMin: number; endMin: number; erasing: boolean };
 
-/** Own slots plus the in-progress draft, merged into blocks per day. */
-function ownBlocks(weekStart: Date, mySlots: Set<number>, draft: Draft | null): OwnBlock[][] {
-  // 0 = not mine, 1 = mine (or being painted), 2 = mine but being erased
-  const state = Array.from({ length: DAYS_PER_WEEK }, () => new Uint8Array(ROWS_PER_DAY));
-  for (const ms of mySlots) {
-    const cell = instantToCell(weekStart, ms);
-    if (cell) state[cell.day][cell.row] = 1;
-  }
+/** Own intervals within the week plus the in-progress draft, as blocks per day. */
+function ownBlocks(weekStart: Date, mine: Interval[], draft: Draft | null): OwnBlock[][] {
+  const { from, to } = weekRange(weekStart);
+  let shown = clip(mine, from, to);
+  let erasing: Interval[] = [];
   if (draft) {
-    const { day0, day1, row0, row1 } = draftBounds(draft);
-    for (let day = day0; day <= day1; day++) {
-      for (let row = row0; row <= row1; row++) {
-        if (draft.mode === "erase") state[day][row] *= 2;
-        else if (cellToInstant(weekStart, day, row) !== null) state[day][row] = 1;
+    const rect = draftIntervals(weekStart, draft);
+    if (draft.mode === "paint") shown = union(shown, rect);
+    else {
+      const kept = subtract(shown, rect);
+      erasing = subtract(shown, kept); // the parts of my time inside the rectangle
+      shown = kept;
+    }
+  }
+  const byDay: OwnBlock[][] = Array.from({ length: DAYS_PER_WEEK }, () => []);
+  const place = (ranges: Interval[], isErasing: boolean) => {
+    for (const range of ranges) {
+      for (const { day, startMin, endMin } of splitByDay(weekStart, range)) {
+        byDay[day].push({ startMin, endMin, erasing: isErasing });
       }
     }
-  }
-  return state.map((rows) => {
-    const blocks: OwnBlock[] = [];
-    for (let row = 0; row < ROWS_PER_DAY; row++) {
-      if (!rows[row]) continue;
-      const prev = blocks[blocks.length - 1];
-      const erasing = rows[row] === 2;
-      if (prev && prev.endRow === row && prev.erasing === erasing) prev.endRow = row + 1;
-      else blocks.push({ startRow: row, endRow: row + 1, erasing });
-    }
-    return blocks;
-  });
+  };
+  place(shown, false);
+  place(erasing, true);
+  for (const blocks of byDay) blocks.sort((a, b) => a.startMin - b.startMin);
+  return byDay;
 }
 
-export function WeekGrid({ weekStart, users, included, runs, mySlots, onCommit }: WeekGridProps) {
+type Hover = Cell & { anchor: PopoverAnchor };
+
+export function WeekGrid({ weekStart, users, included, runs, mine, onCommit }: WeekGridProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const colsRef = useRef<HTMLDivElement>(null);
   const now = useNow();
-  const { draft, handlers } = usePaint({ weekStart, mySlots, onCommit });
-  const [hover, setHover] = useState<(Cell & { anchor: PopoverAnchor }) | null>(null);
+  const { draft, handlers } = usePaint({ weekStart, mine, onCommit });
+  const [hover, setHover] = useState<Hover | null>(null);
 
   const days = useMemo(() => weekDays(weekStart), [weekStart]);
   const runsByDay = useMemo(() => days.map((_, day) => runs.filter((r) => r.day === day)), [days, runs]);
-  const own = useMemo(() => ownBlocks(weekStart, mySlots, draft), [weekStart, mySlots, draft]);
+  const own = useMemo(() => ownBlocks(weekStart, mine, draft), [weekStart, mine, draft]);
+  const ownEmpty = own.every((blocks) => blocks.length === 0);
 
-  const runAt = ({ day, row }: Cell) => runsByDay[day].find((r) => r.startRow <= row && row < r.endRow);
+  const runAt = ({ day, min }: Cell) => runsByDay[day].find((r) => r.startMin <= min && min < r.endMin);
   const hoveredRun = hover && !draft ? runAt(hover) : undefined;
 
   useLayoutEffect(() => {
@@ -76,19 +79,19 @@ export function WeekGrid({ weekStart, users, included, runs, mySlots, onCommit }
     const cols = colsRef.current;
     if (!scroller || !cols) return;
     // The sticky header overlays the scrollport, so this puts 8 AM right below it.
-    scroller.scrollTop = (cols.getBoundingClientRect().height / ROWS_PER_DAY) * FIRST_VISIBLE_ROW - 10;
+    scroller.scrollTop = (cols.getBoundingClientRect().height / MINUTES_PER_DAY) * FIRST_VISIBLE_MIN - 10;
   }, []);
 
   const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
     handlers.onPointerMove(e);
     if (e.pointerType === "touch" || e.buttons !== 0) return setHover(null);
-    const cell = cellAt(e.currentTarget, e.clientX, e.clientY);
+    const cell = pointAt(e.currentTarget, e.clientX, e.clientY);
     const run = runAt(cell);
     if (!run) return setHover(null);
     const rect = e.currentTarget.getBoundingClientRect();
     const colW = rect.width / DAYS_PER_WEEK;
     const left = rect.left + cell.day * colW;
-    const next = { ...cell, anchor: { left, right: left + colW, y: e.clientY } };
+    const next: Hover = { ...cell, anchor: { left, right: left + colW, y: e.clientY } };
     // Only re-render (and re-place the popover) when the pointer enters a different run.
     setHover((prev) => (prev && runAt(prev) === run ? prev : next));
   };
@@ -117,9 +120,9 @@ export function WeekGrid({ weekStart, users, included, runs, mySlots, onCommit }
           </div>
           <div className="grid-body">
             <div className="grid-gutter" aria-hidden>
-              {HOUR_ROWS.map((row) => (
-                <span key={row} className="grid-hour" style={{ top: `calc(var(--row-h) * ${row})` }}>
-                  {formatRow(row)}
+              {HOURS.map((hour) => (
+                <span key={hour} className="grid-hour" style={{ top: `calc(var(--hour-h) * ${hour})` }}>
+                  {formatHour(hour)}
                 </span>
               ))}
             </div>
@@ -136,10 +139,16 @@ export function WeekGrid({ weekStart, users, included, runs, mySlots, onCommit }
                   <div className="grid-own-layer">
                     {own[day].map((b) => (
                       <div
-                        key={b.startRow}
+                        key={b.startMin}
                         className={b.erasing ? "grid-own grid-own-erasing" : "grid-own"}
-                        style={rowBox(b.startRow, b.endRow)}
-                      />
+                        style={minuteBox(b.startMin, b.endMin)}
+                      >
+                        {minutesToPx(b.endMin - b.startMin) >= OWN_LABEL_MIN_PX && (
+                          <span className="grid-own-time">
+                            {formatMinutes(b.startMin)}–{formatMinutes(b.endMin)}
+                          </span>
+                        )}
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -149,7 +158,7 @@ export function WeekGrid({ weekStart, users, included, runs, mySlots, onCommit }
           </div>
         </div>
       </div>
-      {runs.length === 0 && mySlots.size === 0 && !draft && (
+      {runs.length === 0 && ownEmpty && !draft && (
         <p className="grid-hint">Drag on the calendar to mark when you&apos;re free</p>
       )}
       {hoveredRun && hover && (

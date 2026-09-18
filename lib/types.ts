@@ -1,9 +1,14 @@
 // Shared contracts. Every module in the app talks through these shapes.
 
-/** One availability slot is 30 minutes. Slots are identified by their start instant in epoch ms. */
-export const SLOT_MS = 30 * 60 * 1000;
-export const ROWS_PER_DAY = 48;
+/** Availability is stored as exact ranges with minute precision. */
+export const MINUTE_MS = 60 * 1000;
+export const MINUTES_PER_DAY = 24 * 60;
+/** Dragging on the grid snaps to this many minutes; the input box allows any minute. */
+export const SNAP_MIN = 15;
 export const DAYS_PER_WEEK = 7;
+
+/** Half-open [start, end) range in epoch ms, both minute-aligned, start < end. */
+export type Interval = { start: number; end: number };
 
 /** Public user shape. Never includes email. */
 export type User = {
@@ -12,26 +17,27 @@ export type User = {
   image: string | null;
 };
 
-/** GET /api/slots?from=<ms>&to=<ms> — free slots (epoch ms, ascending) per user id, for every user. */
+/** GET /api/slots?from=<ms>&to=<ms> — every user's free intervals that overlap [from, to), sorted and merged per user. */
 export type SlotsResponse = {
   users: User[];
-  slots: Record<string, number[]>;
+  intervals: Record<string, Interval[]>;
 };
 
-/** POST /api/slots — applied to the signed-in user only. */
+/** POST /api/slots — applied to the signed-in user only: free time = (current ∪ add) − remove. */
 export type SlotsPatch = {
-  add: number[];
-  remove: number[];
+  add: Interval[];
+  remove: Interval[];
 };
 
 /**
  * A vertical stretch of one day column in which the same set of people is free.
- * `day` is 0-6 within the visible week, rows are 0-47, `endRow` is exclusive.
+ * `day` is 0-6 within the visible week; `startMin`/`endMin` are wall-clock minutes from that
+ * day's midnight (0-1440), `endMin` exclusive.
  */
 export type Run = {
   day: number;
-  startRow: number;
-  endRow: number;
+  startMin: number;
+  endMin: number;
   /** Ids of included users free for the whole run, sorted. Never empty. */
   free: string[];
 };

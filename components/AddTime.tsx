@@ -6,9 +6,9 @@ import type { Interval, SlotsPatch } from "@/lib/types";
 
 export type AddTimeProps = {
   weekStart: Date;
-  /** Adds (or removes) exact minute ranges of the signed-in user's free time in the visible week. */
+  /** Adds exact minute ranges of the signed-in user's free time in the visible week. */
   onCommit: (patch: SlotsPatch) => void;
-  /** Present only in the mobile sheet; call after a successful Add/Remove so the sheet can close. */
+  /** Present only in the mobile sheet; call after a successful Add so the sheet can close. */
   onDone?: () => void;
 };
 
@@ -61,22 +61,18 @@ export function AddTime({ weekStart, onCommit, onDone }: AddTimeProps) {
   const toggleDay = (day: number) =>
     setDays((cur) => (cur.includes(day) ? cur.filter((d) => d !== day) : [...cur, day].sort((a, b) => a - b)));
 
-  const commit = (kind: "add" | "remove") => {
+  const onSubmit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
     if (!canSubmit || fromMin === null || toMin === null) return;
     const intervals: Interval[] = days.map((day) => ({
       start: instantAt(weekStart, day, fromMin),
       end: instantAt(weekStart, day, toMin),
     }));
-    onCommit(kind === "add" ? { add: intervals, remove: [] } : { add: [], remove: intervals });
+    onCommit({ add: intervals, remove: [] });
     const names = days.map((day) => dates[day].toLocaleDateString("en-US", { weekday: "short" })).join(", ");
-    const text = `${kind === "add" ? "Added" : "Removed"} ${names} ${formatSpan(fromMin, toMin)}`;
+    const text = `Added ${names} ${formatSpan(fromMin, toMin)}`;
     setNotice((cur) => ({ id: (cur?.id ?? 0) + 1, text }));
     onDone?.();
-  };
-
-  const onSubmit = (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    commit("add");
   };
 
   return (
@@ -93,7 +89,11 @@ export function AddTime({ weekStart, onCommit, onDone }: AddTimeProps) {
               type="button"
               className={`addtime-chip${isToday ? " is-today" : ""}`}
               aria-pressed={selected}
-              aria-label={date.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}
+              aria-label={date.toLocaleDateString("en-US", {
+                weekday: "long",
+                month: "short",
+                day: "numeric",
+              })}
               onClick={() => toggleDay(day)}
             >
               <span aria-hidden>{date.toLocaleDateString("en-US", { weekday: "narrow" })}</span>
@@ -133,14 +133,9 @@ export function AddTime({ weekStart, onCommit, onDone }: AddTimeProps) {
         </label>
       </div>
 
-      <div className="flex gap-2">
-        <button type="submit" className="btn btn-primary flex-1" disabled={!canSubmit}>
-          Add
-        </button>
-        <button type="button" className="btn flex-1" disabled={!canSubmit} onClick={() => commit("remove")}>
-          Remove
-        </button>
-      </div>
+      <button type="submit" className="btn btn-primary w-full" disabled={!canSubmit}>
+        Add
+      </button>
 
       <p id={`${id}-status`} className="addtime-status text-[12px] text-muted" aria-live="polite">
         {inverted ? (

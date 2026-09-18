@@ -5,6 +5,7 @@ import { AddTime } from "@/components/AddTime";
 import { Sidebar } from "@/components/Sidebar";
 import { TopBar } from "@/components/TopBar";
 import { WeekGrid } from "@/components/grid/WeekGrid";
+import { YourTimes } from "@/components/YourTimes";
 import { bestTimes } from "@/lib/best-times";
 import { computeRuns } from "@/lib/overlap";
 import { addWeeks, startOfWeek } from "@/lib/time";
@@ -58,20 +59,15 @@ export function CalendarApp({ me }: { me: User }) {
           onToggle={(id) => setOverrides((o) => ({ ...o, [id]: !included.has(id) }))}
           bestTimes={best}
           weekStart={weekStart}
-          onCommit={commit}
-        />
-        <WeekGrid
-          weekStart={weekStart}
-          users={users}
-          included={included}
-          runs={runs}
           mine={mine}
           onCommit={commit}
         />
+        <WeekGrid weekStart={weekStart} users={users} included={included} runs={runs} mine={mine} onCommit={commit} />
       </div>
       {addOpen && (
-        <div className="add-sheet md:hidden" role="dialog" aria-label="Add free time">
+        <div className="add-sheet flex flex-col gap-5 md:hidden" role="dialog" aria-label="Add free time">
           <AddTime weekStart={weekStart} onCommit={commit} onDone={() => setAddOpen(false)} />
+          <YourTimes weekStart={weekStart} mine={mine} onCommit={commit} />
         </div>
       )}
     </div>

@@ -3,8 +3,6 @@
 /** Availability is stored as exact ranges with minute precision. */
 export const MINUTE_MS = 60 * 1000;
 export const MINUTES_PER_DAY = 24 * 60;
-/** Dragging on the grid snaps to this many minutes; the input box allows any minute. */
-export const SNAP_MIN = 15;
 export const DAYS_PER_WEEK = 7;
 
 /** Half-open [start, end) range in epoch ms, both minute-aligned, start < end. */

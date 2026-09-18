@@ -1,11 +1,11 @@
 # stuzzy
 
 See when everyone's free. A minimalist, liquid-glass week calendar for one Stanford friend group:
-drag to paint when you're free, and the heatmap shows where the group overlaps. Slots where
+mark when you're free, and the heatmap shows where the group overlaps. Slots where
 everyone is free glow cardinal.
 
 - Google sign-in, `@stanford.edu` accounts only
-- Drag to paint (15-minute snap) or type exact minutes in the "Add free time" box
+- Add free time by day and exact minutes; remove entries from the "Your times" list or with the × on your block
 - One shared calendar, real dates, week navigation (`←` `→` `t`)
 - Hover any block to see who's free and who's busy; sidebar ranks the best times of the week
 
@@ -59,7 +59,7 @@ Import the GitHub repo in Vercel, run `vercel integration add clerk` (provisions
 
 - Free time is stored as exact minute ranges (`intervals` table, one row per merged range). A patch is
   `(current ∪ add) − remove`, computed by `lib/intervals.ts` on both the server and the optimistic client.
-- Dragging on the grid snaps to 15 minutes; the "Add free time" box in the sidebar takes any minute.
+- Time is entered through the "Add free time" panel (any minute); the grid itself is display-only.
 - `lib/time.ts` does all calendar math in local time (DST-safe); `lib/overlap.ts` sweeps intervals into
   per-day runs for the heatmap; `lib/best-times.ts` ranks meeting windows.
 - "Everyone" means the people checked in the sidebar; by default that's whoever has marked time in the

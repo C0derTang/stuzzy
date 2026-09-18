@@ -91,7 +91,11 @@
   body {
     background: var(--bg);
     color: var(--fg);
-    font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+    font-family:
+      var(--font-sans),
+      system-ui,
+      -apple-system,
+      sans-serif;
     font-size: 14px;
     line-height: 1.4;
   }
@@ -258,6 +262,8 @@
     right: 12px;
     bottom: 12px;
     z-index: 40;
+    max-height: 70vh;
+    overflow-y: auto;
     padding: 16px;
     padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
     background: var(--glass-strong-bg);
@@ -387,6 +393,53 @@
   .addtime-notice {
     display: inline-block;
     animation: addtime-fade 2s ease forwards;
+  }
+
+  /* YourTimes: one row per free block; the list scrolls inside its panel when long. */
+  .yourtimes-list {
+    display: flex;
+    flex-direction: column;
+    max-height: 240px;
+    margin: 0 -6px;
+    overflow-y: auto;
+  }
+
+  .yourtimes-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 2px 6px;
+    border-radius: 8px;
+    font-size: 13px;
+  }
+
+  .yourtimes-row:hover {
+    background: var(--control-bg);
+  }
+
+  .yourtimes-day {
+    flex: none;
+    width: 30px;
+    color: var(--fg-muted);
+  }
+
+  .yourtimes-span {
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .yourtimes-remove {
+    flex: none;
+    width: 28px;
+    min-height: 28px;
+    padding: 0;
+    color: var(--fg-muted);
+  }
+
+  .yourtimes-remove:hover {
+    color: var(--fg);
   }
 }
 

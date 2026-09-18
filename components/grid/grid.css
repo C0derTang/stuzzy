@@ -100,7 +100,7 @@
 .grid-cols {
   position: relative;
   height: calc(var(--hour-h) * 24);
-  /* Hour lines, fainter half-hour lines, then very faint quarter-hour ticks (the drag snap). */
+  /* Hour lines, fainter half-hour lines, then very faint quarter-hour ticks. */
   background-image:
     linear-gradient(var(--grid-line) 1px, transparent 1px),
     linear-gradient(color-mix(in srgb, var(--grid-line) 45%, transparent) 1px, transparent 1px),
@@ -113,10 +113,9 @@
     0 -1px,
     0 calc(var(--hour-h) / 2 - 1px),
     0 calc(var(--hour-h) / 4 - 1px);
-  cursor: cell;
   user-select: none;
   -webkit-user-select: none;
-  /* Native scrolling both ways (the grid scrolls sideways on phones); taps toggle a slot. */
+  /* Native scrolling both ways (the grid scrolls sideways on phones). */
   touch-action: pan-x pan-y;
 }
 
@@ -175,7 +174,10 @@
 
 /* Own slots: bar + outline so they read on top of any heat tint */
 
+/* Hoverable only so the × can reveal itself; the block has no handlers, so pointer events still
+   bubble to .grid-cols and the hover popover keeps working over it. */
 .grid-own {
+  pointer-events: auto;
   position: absolute;
   right: 1px;
   left: 1px;
@@ -199,15 +201,51 @@
   white-space: nowrap;
 }
 
-.grid-own-erasing {
-  border-left-style: dashed;
-  background: repeating-linear-gradient(
-    135deg,
-    rgb(var(--accent-rgb) / 0.22) 0 2px,
-    transparent 2px 7px
-  );
-  box-shadow: inset 0 0 0 1px rgb(var(--accent-rgb) / 0.2);
-  opacity: 0.45;
+/* Remove button: a tiny glass circle in the top-right corner, revealed on hover/focus.
+   Blocks shorter than the button center it vertically instead so the clipped part is symmetric. */
+.grid-own-x {
+  position: absolute;
+  top: min(2px, calc(50% - 10px));
+  right: 2px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid rgb(255 255 255 / 0.35);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.18);
+  color: var(--fg);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: auto;
+  transition: opacity 0.12s ease;
+}
+
+.grid-own-x svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+.grid-own:hover .grid-own-x,
+.grid-own-x:focus-visible {
+  opacity: 1;
+}
+
+.grid-own-x:hover {
+  color: var(--accent);
+}
+
+@media (hover: none) {
+  .grid-own-x {
+    opacity: 1;
+  }
 }
 
 /* Now line */
@@ -303,7 +341,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .heat-block {
+  .heat-block,
+  .grid-own-x {
     transition: none;
   }
 }

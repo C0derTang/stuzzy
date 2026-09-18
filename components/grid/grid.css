@@ -20,12 +20,6 @@
   overscroll-behavior: contain;
 }
 
-@media (max-width: 767px) {
-  .grid-inner {
-    min-width: 640px;
-  }
-}
-
 .grid-head,
 .grid-body {
   display: grid;
@@ -124,6 +118,71 @@
   border-left: 1px solid var(--grid-line);
 }
 
+/* Phones: three day columns beside the gutter, the rest reached by swiping.
+   `cqi` is the panel's own content width, so the columns fit whatever the shell leaves us. */
+@media (max-width: 767px) {
+  .grid-panel {
+    container-type: inline-size;
+  }
+
+  .grid-inner {
+    --col-w: calc((100cqi - var(--gutter-w)) / 3);
+    min-width: calc(var(--gutter-w) + 7 * var(--col-w));
+  }
+
+  /* Flex rather than grid: a sticky grid item is constrained to its own grid area, a flex item
+     to the whole container, which is what lets the gutter stay put while the columns scroll. */
+  .grid-head,
+  .grid-body {
+    display: flex;
+  }
+
+  .grid-corner,
+  .grid-gutter {
+    flex: 0 0 var(--gutter-w);
+  }
+
+  .grid-days,
+  .grid-cols {
+    flex: none;
+    width: calc(7 * var(--col-w));
+    grid-template-columns: repeat(7, var(--col-w));
+  }
+
+  /* Swipes land on a day boundary; the padding keeps the snapped column clear of the sticky gutter. */
+  .grid-scroll {
+    scroll-snap-type: x proximity;
+    scroll-padding-left: var(--gutter-w);
+  }
+
+  .grid-col,
+  .grid-dayhead {
+    scroll-snap-align: start;
+  }
+
+  /* Pinned while the columns slide under it. */
+  .grid-gutter {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: color-mix(in srgb, var(--bg) 72%, transparent);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+  }
+
+  /* Above both sticky layers. Denser than the gutter: day names pass right under it. */
+  .grid-corner {
+    position: sticky;
+    top: 0;
+    left: 0;
+    z-index: 4;
+    /* Opaque: day numbers scrolling underneath must not ghost through the corner. */
+    background: var(--bg);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+  }
+}
+
 /* Heat */
 
 .heat-layer,
@@ -215,7 +274,7 @@
   padding: 0;
   border: 1px solid rgb(255 255 255 / 0.35);
   border-radius: 50%;
-  background: color-mix(in srgb, var(--bg) 72%, transparent);
+  background: color-mix(in srgb, var(--bg) 85%, transparent);
   -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
   box-shadow: 0 1px 4px rgb(0 0 0 / 0.18);
@@ -242,9 +301,20 @@
   color: var(--accent);
 }
 
+/* Touch: always visible, and a 28px tap target around the 20px button. Nudged in from the
+   block's corner so the invisible ring is not clipped by its `overflow: hidden`. */
 @media (hover: none) {
   .grid-own-x {
+    top: min(4px, calc(50% - 10px));
+    right: 4px;
     opacity: 1;
+  }
+
+  .grid-own-x::after {
+    content: "";
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
   }
 }
 
@@ -252,7 +322,8 @@
 
 .grid-now {
   position: absolute;
-  z-index: 2;
+  /* Above the heat blocks, below the gutter it slides under on phones. */
+  z-index: 1;
   height: 2px;
   margin-top: -1px;
   background: var(--accent);
@@ -299,6 +370,22 @@
   padding: 12px 14px;
   font-size: 13px;
   pointer-events: none;
+}
+
+/* Phones: a card across the bottom instead of beside the column, so it is never clipped.
+   Pointer events are back on so a long list can be scrolled; SlotPopover skips placement here. */
+@media (max-width: 767px) {
+  .grid-popover.glass-strong {
+    top: auto;
+    right: 12px;
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    left: 12px;
+    width: auto;
+    max-height: 50vh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    pointer-events: auto;
+  }
 }
 
 .grid-popover-time {

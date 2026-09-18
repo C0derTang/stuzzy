@@ -8,8 +8,6 @@ export type AddTimeProps = {
   weekStart: Date;
   /** Adds exact minute ranges of the signed-in user's free time in the visible week. */
   onCommit: (patch: SlotsPatch) => void;
-  /** Present only in the mobile sheet; call after a successful Add so the sheet can close. */
-  onDone?: () => void;
 };
 
 const NOTICE_MS = 2000;
@@ -34,7 +32,7 @@ function formatSpan(fromMin: number, toMin: number): string {
   return `${sameHalf ? from.slice(0, -3) : from}–${to}`;
 }
 
-export function AddTime({ weekStart, onCommit, onDone }: AddTimeProps) {
+export function AddTime({ weekStart, onCommit }: AddTimeProps) {
   const id = useId();
   const [today] = useState(() => new Date());
   const [days, setDays] = useState<number[]>(() => {
@@ -72,7 +70,6 @@ export function AddTime({ weekStart, onCommit, onDone }: AddTimeProps) {
     const names = days.map((day) => dates[day].toLocaleDateString("en-US", { weekday: "short" })).join(", ");
     const text = `Added ${names} ${formatSpan(fromMin, toMin)}`;
     setNotice((cur) => ({ id: (cur?.id ?? 0) + 1, text }));
-    onDone?.();
   };
 
   return (
@@ -133,7 +130,7 @@ export function AddTime({ weekStart, onCommit, onDone }: AddTimeProps) {
         </label>
       </div>
 
-      <button type="submit" className="btn btn-primary w-full" disabled={!canSubmit}>
+      <button type="submit" className="btn btn-primary addtime-submit w-full" disabled={!canSubmit}>
         Add
       </button>
 

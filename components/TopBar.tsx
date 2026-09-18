@@ -1,7 +1,7 @@
 "use client";
 
 import { useClerk } from "@clerk/nextjs";
-import { useEffect } from "react";
+import { type RefObject, useEffect } from "react";
 import { Avatar } from "@/components/Avatar";
 import { LogoMark } from "@/components/Logo";
 import { formatWeekLabel } from "@/lib/time";
@@ -13,9 +13,20 @@ export type TopBarProps = {
   onPrev: () => void;
   onNext: () => void;
   onToday: () => void;
-  /** Mobile only (`md:hidden` button): toggles the add-time sheet. */
+  /** Mobile only (`md:hidden` button): toggles the sheet holding the sidebar panels. */
   onAdd: () => void;
+  /** Lets the sheet hand focus back to the "+" button when it closes. */
+  addButtonRef?: RefObject<HTMLButtonElement | null>;
+  sheetOpen?: boolean;
 };
+
+/**
+ * "Sep 13 – 19, 2026" → "Sep 13–19". The year goes first on a narrow screen, then the
+ * spaces around the dash; `formatWeekLabel` stays the single source of the wording.
+ */
+function shortWeekLabel(label: string): string {
+  return label.replace(/,\s*\d{4}/g, "").replace(/ – /g, "–");
+}
 
 function Chevron({ dir }: { dir: "left" | "right" }) {
   return (
@@ -50,6 +61,8 @@ export function TopBar({
   onNext,
   onToday,
   onAdd,
+  addButtonRef,
+  sheetOpen = false,
 }: TopBarProps) {
   const { signOut } = useClerk();
   useEffect(() => {
@@ -71,19 +84,21 @@ export function TopBar({
     return () => window.removeEventListener("keydown", onKey);
   }, [onPrev, onNext, onToday]);
 
+  const label = formatWeekLabel(weekStart);
+
   return (
-    <header className="glass flex h-14 shrink-0 items-center gap-2 px-3 sm:gap-3 sm:px-4">
+    <header className="topbar glass flex h-14 shrink-0 items-center gap-1 px-1.5 sm:gap-3 sm:px-4">
       <div className="hidden items-center gap-2 sm:mr-2 sm:flex">
         <LogoMark />
         <span className="text-[15px] font-semibold tracking-tight">stuzzy</span>
       </div>
-      <button type="button" className="btn" onClick={onToday} title="Today (T)">
+      <button type="button" className="btn topbar-today" onClick={onToday} title="Today (T)">
         Today
       </button>
       <div className="flex items-center">
         <button
           type="button"
-          className="btn btn-ghost w-9 px-0"
+          className="btn btn-ghost topbar-icon px-0"
           onClick={onPrev}
           aria-label="Previous week"
           title="Previous week (←)"
@@ -92,7 +107,7 @@ export function TopBar({
         </button>
         <button
           type="button"
-          className="btn btn-ghost w-9 px-0"
+          className="btn btn-ghost topbar-icon px-0"
           onClick={onNext}
           aria-label="Next week"
           title="Next week (→)"
@@ -100,18 +115,23 @@ export function TopBar({
           <Chevron dir="right" />
         </button>
       </div>
+      {/* Two spellings, one visible at a time: display:none keeps the other out of the a11y tree. */}
       <h1
-        className="min-w-0 truncate text-sm font-medium whitespace-nowrap sm:text-lg"
+        className="min-w-0 flex-1 truncate text-[13px] font-medium whitespace-nowrap sm:text-lg"
+        title={label}
         aria-live="polite"
       >
-        {formatWeekLabel(weekStart)}
+        <span className="sm:hidden">{shortWeekLabel(label)}</span>
+        <span className="hidden sm:inline">{label}</span>
       </h1>
-      <div className="ml-auto flex shrink-0 items-center gap-2.5">
+      <div className="flex shrink-0 items-center gap-1 sm:gap-2.5">
         <button
+          ref={addButtonRef}
           type="button"
-          className="btn btn-ghost w-9 px-0 md:hidden"
-          aria-label="Add free time"
-          title="Add free time"
+          className="btn btn-ghost topbar-icon px-0 md:hidden"
+          aria-label="Your times and people"
+          aria-expanded={sheetOpen}
+          title="Your times and people"
           onClick={onAdd}
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
@@ -131,7 +151,7 @@ export function TopBar({
         </span>
         <button
           type="button"
-          className="btn btn-ghost text-muted"
+          className="btn btn-ghost topbar-signout text-muted"
           aria-label="Sign out"
           title="Sign out"
           onClick={() => signOut({ redirectUrl: "/" })}

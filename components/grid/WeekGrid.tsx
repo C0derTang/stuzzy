@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type PointerEvent } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type PointerEvent } from "react";
 import { clip } from "@/lib/intervals";
 import { formatHour, formatMinutes, instantAt, isSameDay, splitByDay, weekDays, weekRange } from "@/lib/time";
 import { DAYS_PER_WEEK, MINUTES_PER_DAY, type Interval, type Run, type SlotsPatch, type User } from "@/lib/types";
@@ -25,11 +25,14 @@ const HOURS = Array.from({ length: 23 }, (_, i) => i + 1);
 const FIRST_VISIBLE_MIN = 8 * 60;
 /** An own block shows its exact times once it is at least this tall. */
 const OWN_LABEL_MIN_PX = 22;
+/** How far a touch may travel and still count as a tap rather than a swipe. */
+const TAP_SLOP_PX = 8;
 
 /** A day column and wall-clock minutes from its midnight. */
 type Cell = { day: number; min: number };
 type OwnBlock = { startMin: number; endMin: number };
-type Hover = Cell & { anchor: PopoverAnchor };
+/** `touch` marks a popover opened by tapping, which only a tap elsewhere dismisses. */
+type Hover = Cell & { anchor: PopoverAnchor; touch?: boolean };
 
 const clamp = (n: number, max: number) => Math.min(max, Math.max(0, n));
 
@@ -40,6 +43,14 @@ function pointAt(el: Element, clientX: number, clientY: number): Cell {
     day: clamp(Math.floor(((clientX - rect.left) / rect.width) * DAYS_PER_WEEK), DAYS_PER_WEEK - 1),
     min: clamp(Math.floor(((clientY - rect.top) / rect.height) * MINUTES_PER_DAY), MINUTES_PER_DAY - 1),
   };
+}
+
+/** Where the popover for a day column should sit: its viewport edges and the pointer's y. */
+function anchorAt(el: Element, day: number, clientY: number): PopoverAnchor {
+  const rect = el.getBoundingClientRect();
+  const colW = rect.width / DAYS_PER_WEEK;
+  const left = rect.left + day * colW;
+  return { left, right: left + colW, y: clientY };
 }
 
 /** Own intervals within the week, as blocks per day. */
@@ -58,8 +69,11 @@ function ownBlocks(weekStart: Date, mine: Interval[]): OwnBlock[][] {
 export function WeekGrid({ weekStart, users, included, runs, mine, onCommit }: WeekGridProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const colsRef = useRef<HTMLDivElement>(null);
+  /** Where the current touch went down, to tell a tap from a swipe. */
+  const tapRef = useRef<{ x: number; y: number } | null>(null);
   const now = useNow();
   const [hover, setHover] = useState<Hover | null>(null);
+  const tapped = hover?.touch ?? false;
 
   const days = useMemo(() => weekDays(weekStart), [weekStart]);
   const runsByDay = useMemo(() => days.map((_, day) => runs.filter((r) => r.day === day)), [days, runs]);
@@ -77,17 +91,60 @@ export function WeekGrid({ weekStart, users, included, runs, mine, onCommit }: W
     scroller.scrollTop = (cols.getBoundingClientRect().height / MINUTES_PER_DAY) * FIRST_VISIBLE_MIN - 10;
   }, []);
 
+  // Phones show three days at a time, so open the week on today (day 0 for any other week).
+  useLayoutEffect(() => {
+    const scroller = scrollRef.current;
+    const cols = colsRef.current;
+    if (!scroller || !cols) return;
+    const overflow = scroller.scrollWidth - scroller.clientWidth;
+    if (overflow <= 0) return;
+    const today = days.findIndex((d) => isSameDay(d, new Date()));
+    const colW = cols.getBoundingClientRect().width / DAYS_PER_WEEK;
+    scroller.scrollLeft = Math.min(Math.max(today, 0) * colW, overflow);
+  }, [days]);
+
+  // A popover opened by tapping stays until something outside the grid (or the popover) is touched.
+  useEffect(() => {
+    if (!tapped) return;
+    const dismiss = (e: Event) => {
+      const target = e.target;
+      if (!(target instanceof Element)) return;
+      if (colsRef.current?.contains(target) || target.closest(".grid-popover")) return;
+      setHover(null);
+    };
+    document.addEventListener("pointerdown", dismiss, true);
+    return () => document.removeEventListener("pointerdown", dismiss, true);
+  }, [tapped]);
+
   const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
-    if (e.pointerType === "touch" || e.buttons !== 0) return setHover(null);
+    // Touch drives the popover from pointerup instead; a swipe must not disturb it.
+    if (e.pointerType === "touch") return;
+    if (e.buttons !== 0) return setHover(null);
     const cell = pointAt(e.currentTarget, e.clientX, e.clientY);
     const run = runAt(cell);
     if (!run) return setHover(null);
-    const rect = e.currentTarget.getBoundingClientRect();
-    const colW = rect.width / DAYS_PER_WEEK;
-    const left = rect.left + cell.day * colW;
-    const next: Hover = { ...cell, anchor: { left, right: left + colW, y: e.clientY } };
+    const next: Hover = { ...cell, anchor: anchorAt(e.currentTarget, cell.day, e.clientY) };
     // Only re-render (and re-place the popover) when the pointer enters a different run.
     setHover((prev) => (prev && runAt(prev) === run ? prev : next));
+  };
+
+  const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
+    tapRef.current = e.pointerType === "touch" ? { x: e.clientX, y: e.clientY } : null;
+  };
+
+  const onPointerUp = (e: PointerEvent<HTMLDivElement>) => {
+    const start = tapRef.current;
+    tapRef.current = null;
+    if (e.pointerType !== "touch" || !start) return;
+    // Only a tap that stayed put, and not the one that dismisses an own block.
+    if (Math.hypot(e.clientX - start.x, e.clientY - start.y) > TAP_SLOP_PX) return;
+    if (e.target instanceof Element && e.target.closest(".grid-own-x")) return;
+    const cell = pointAt(e.currentTarget, e.clientX, e.clientY);
+    const run = runAt(cell);
+    if (!run) return setHover(null);
+    const next: Hover = { ...cell, anchor: anchorAt(e.currentTarget, cell.day, e.clientY), touch: true };
+    // Tapping the open run again closes it.
+    setHover((prev) => (prev && runAt(prev) === run ? null : next));
   };
 
   const remove = (e: MouseEvent<HTMLButtonElement>, day: number, b: OwnBlock) => {
@@ -103,7 +160,7 @@ export function WeekGrid({ weekStart, users, included, runs, mine, onCommit }: W
       <div className="grid-scroll" ref={scrollRef} onScroll={() => setHover(null)}>
         <div className="grid-inner">
           <div className="grid-head">
-            <div />
+            <div className="grid-corner" />
             <div className="grid-days">
               {days.map((d) => {
                 const today = now !== null && isSameDay(d, new Date(now));
@@ -132,7 +189,16 @@ export function WeekGrid({ weekStart, users, included, runs, mine, onCommit }: W
               ref={colsRef}
               className="grid-cols"
               onPointerMove={onPointerMove}
-              onPointerLeave={() => setHover(null)}
+              onPointerDown={onPointerDown}
+              onPointerUp={onPointerUp}
+              onPointerCancel={() => {
+                // The browser took the touch over for scrolling; it is a swipe, not a tap.
+                tapRef.current = null;
+              }}
+              onPointerLeave={(e) => {
+                // A touch pointer leaves as soon as it lifts, which would close the popover it just opened.
+                if (e.pointerType !== "touch") setHover(null);
+              }}
             >
               {days.map((d, day) => {
                 const weekday = d.toLocaleDateString("en-US", { weekday: "long" });

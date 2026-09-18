@@ -12,6 +12,8 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
+  // Lets the bottom sheet pad itself past the home indicator via env(safe-area-inset-bottom).
+  viewportFit: "cover",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#f4f1fb" },
     { media: "(prefers-color-scheme: dark)", color: "#0e0b16" },

@@ -1,11 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { AddTime } from "@/components/AddTime";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { MobileSheet, type SheetTab } from "@/components/MobileSheet";
 import { Sidebar } from "@/components/Sidebar";
 import { TopBar } from "@/components/TopBar";
 import { WeekGrid } from "@/components/grid/WeekGrid";
-import { YourTimes } from "@/components/YourTimes";
 import { bestTimes } from "@/lib/best-times";
 import { computeRuns } from "@/lib/overlap";
 import { addWeeks, startOfWeek } from "@/lib/time";
@@ -21,8 +20,9 @@ export function CalendarApp({ me }: { me: User }) {
   // Explicit checkbox choices; everyone else defaults to "included when active this week".
   const [overrides, setOverrides] = useState<Record<string, boolean>>({});
   const [now] = useState(() => Date.now());
-  // Mobile only: the sidebar is hidden, so the input box opens as a sheet.
-  const [addOpen, setAddOpen] = useState(false);
+  // Mobile only: the sidebar is hidden, so its panels open as a tabbed sheet.
+  const [sheetTab, setSheetTab] = useState<SheetTab | null>(null);
+  const addButtonRef = useRef<HTMLButtonElement>(null);
   const { data, commit } = useSlots(weekStart, me.id);
 
   const users = data?.users ?? NO_USERS;
@@ -40,6 +40,11 @@ export function CalendarApp({ me }: { me: User }) {
   const best = useMemo(() => bestTimes(runs, weekStart, now), [runs, weekStart, now]);
   const mine = intervals[me.id] ?? NONE;
 
+  const toggleUser = useCallback((id: string) => setOverrides((o) => ({ ...o, [id]: !included.has(id) })), [included]);
+  // The "+" always lands on Times; tapping it again closes the sheet.
+  const toggleSheet = useCallback(() => setSheetTab((t) => (t === null ? "times" : null)), []);
+  const closeSheet = useCallback(() => setSheetTab(null), []);
+
   return (
     <div className="app-shell">
       <TopBar
@@ -48,7 +53,9 @@ export function CalendarApp({ me }: { me: User }) {
         onPrev={() => setWeekStart((w) => addWeeks(w, -1))}
         onNext={() => setWeekStart((w) => addWeeks(w, 1))}
         onToday={() => setWeekStart(startOfWeek(new Date()))}
-        onAdd={() => setAddOpen((o) => !o)}
+        onAdd={toggleSheet}
+        addButtonRef={addButtonRef}
+        sheetOpen={sheetTab !== null}
       />
       <div className="app-body">
         <Sidebar
@@ -56,7 +63,7 @@ export function CalendarApp({ me }: { me: User }) {
           users={users}
           included={included}
           activeIds={activeIds}
-          onToggle={(id) => setOverrides((o) => ({ ...o, [id]: !included.has(id) }))}
+          onToggle={toggleUser}
           bestTimes={best}
           weekStart={weekStart}
           mine={mine}
@@ -64,11 +71,22 @@ export function CalendarApp({ me }: { me: User }) {
         />
         <WeekGrid weekStart={weekStart} users={users} included={included} runs={runs} mine={mine} onCommit={commit} />
       </div>
-      {addOpen && (
-        <div className="add-sheet flex flex-col gap-5 md:hidden" role="dialog" aria-label="Add free time">
-          <AddTime weekStart={weekStart} onCommit={commit} onDone={() => setAddOpen(false)} />
-          <YourTimes weekStart={weekStart} mine={mine} onCommit={commit} />
-        </div>
+      {sheetTab !== null && (
+        <MobileSheet
+          tab={sheetTab}
+          onTabChange={setSheetTab}
+          onClose={closeSheet}
+          returnFocusRef={addButtonRef}
+          me={me}
+          users={users}
+          included={included}
+          activeIds={activeIds}
+          onToggle={toggleUser}
+          bestTimes={best}
+          weekStart={weekStart}
+          mine={mine}
+          onCommit={commit}
+        />
       )}
     </div>
   );
